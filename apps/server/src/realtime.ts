@@ -7,7 +7,15 @@ import {
   type Message,
   type ServerToClientEvents,
 } from "@jingles/shared";
-import { getConversation, insertMessage } from "./db";
+import {
+  getConversation,
+  insertMessage,
+  listMessages,
+  updateMessageSentiment,
+} from "./db";
+import { analyzeSentiment } from "./sentiment";
+
+const SENTIMENT_CONTEXT_LIMIT = 5;
 
 type IO = SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
 
@@ -58,6 +66,8 @@ export function attachRealtime(httpServer: HTTPServer): IO {
         createdAt: msg.createdAt,
       });
       io.to(room(conversationId)).emit("message:new", msg);
+
+      void runSentiment(io, msg);
     });
 
     socket.on("disconnect", (reason) => {
@@ -66,4 +76,21 @@ export function attachRealtime(httpServer: HTTPServer): IO {
   });
 
   return io;
+}
+
+async function runSentiment(io: IO, msg: Message): Promise<void> {
+  try {
+    const history = listMessages(msg.conversationId);
+    const recentContext = history
+      .filter((m) => m.id !== msg.id)
+      .slice(-SENTIMENT_CONTEXT_LIMIT);
+    const sentiment = await analyzeSentiment(msg, recentContext);
+    updateMessageSentiment(msg.id, sentiment);
+    io.to(room(msg.conversationId)).emit("message:analyzed", {
+      messageId: msg.id,
+      sentiment,
+    });
+  } catch (err) {
+    console.error(`sentiment failed for ${msg.id}:`, err);
+  }
 }

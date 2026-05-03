@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { Message } from "@jingles/shared";
+import { SentimentIndicator } from "./sentiment-indicator";
 
 interface Props {
   message: Message;
@@ -8,27 +9,35 @@ interface Props {
 
 export function MessageBubble({ message, isOwn }: Props) {
   return (
-    <View
-      style={[
-        styles.row,
-        isOwn ? styles.rowOwn : styles.rowOther,
-      ]}
-    >
+    <View style={styles.wrapper}>
       <View
         style={[
-          styles.bubble,
-          isOwn ? styles.bubbleOwn : styles.bubbleOther,
+          styles.row,
+          isOwn ? styles.rowOwn : styles.rowOther,
         ]}
       >
-        <Text style={isOwn ? styles.textOwn : styles.textOther}>
-          {message.content}
-        </Text>
+        <View
+          style={[
+            styles.bubble,
+            isOwn ? styles.bubbleOwn : styles.bubbleOther,
+          ]}
+        >
+          <Text style={isOwn ? styles.textOwn : styles.textOther}>
+            {message.content}
+          </Text>
+        </View>
       </View>
+      {message.sentiment ? (
+        <SentimentIndicator label={message.sentiment.label} isOwn={isOwn} />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    paddingVertical: 2,
+  },
   row: {
     flexDirection: "row",
     paddingHorizontal: 12,

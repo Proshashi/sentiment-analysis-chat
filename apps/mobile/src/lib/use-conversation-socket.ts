@@ -5,7 +5,7 @@ import {
   getApiUrl,
   type JinglesSocket,
 } from "@jingles/api-client";
-import type { Message } from "@jingles/shared";
+import type { Message, Sentiment } from "@jingles/shared";
 import { useMessages } from "./messages-context";
 
 interface UseConversationSocketArgs {
@@ -23,7 +23,7 @@ export function useConversationSocket({
   conversationId,
   userId,
 }: UseConversationSocketArgs): UseConversationSocket {
-  const { upsertMessage, setAll } = useMessages();
+  const { upsertMessage, setAll, applySentiment } = useMessages();
   const socketRef = useRef<JinglesSocket | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +49,14 @@ export function useConversationSocket({
       upsertMessage(msg);
     });
 
+    socket.on(
+      "message:analyzed",
+      ({ messageId, sentiment }: { messageId: string; sentiment: Sentiment }) => {
+        if (cancelled) return;
+        applySentiment(messageId, sentiment);
+      },
+    );
+
     (async () => {
       try {
         const history = await fetchMessages(conversationId);
@@ -67,7 +75,7 @@ export function useConversationSocket({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [conversationId, userId, upsertMessage, setAll]);
+  }, [conversationId, userId, upsertMessage, setAll, applySentiment]);
 
   const send = useCallback(
     (content: string) => {

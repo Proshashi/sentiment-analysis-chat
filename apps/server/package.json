@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
     "@jingles/shared": "workspace:*",
     "better-sqlite3": "^11.5.0",
     "cors": "^2.8.5",
