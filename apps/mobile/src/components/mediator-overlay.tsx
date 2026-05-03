@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Markdown from "react-native-markdown-display";
 import type { MediatorState } from "../lib/use-conversation-socket";
 
 interface Props {
@@ -79,8 +80,8 @@ export function MediatorOverlay({ state, onClose }: Props) {
               <Text style={styles.loadingText}>Thinking…</Text>
             </View>
           ) : (
-            <Text style={styles.text}>
-              {state.text}
+            <View>
+              <Markdown style={markdownStyles}>{state.text}</Markdown>
               {state.streaming ? (
                 <Animated.Text
                   style={[styles.cursor, { opacity: cursorOpacity }]}
@@ -88,7 +89,7 @@ export function MediatorOverlay({ state, onClose }: Props) {
                   ▍
                 </Animated.Text>
               ) : null}
-            </Text>
+            </View>
           )}
         </ScrollView>
 
@@ -200,5 +201,73 @@ const styles = StyleSheet.create({
     color: "#7C3AED",
     textAlign: "center",
     fontStyle: "italic",
+  },
+});
+
+const markdownStyles = StyleSheet.create({
+  body: {
+    fontSize: 17,
+    lineHeight: 26,
+    color: "#1E1B4B",
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: 12,
+  },
+  heading1: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#4C1D95",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  heading2: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: "#4C1D95",
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  heading3: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#4C1D95",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  strong: {
+    fontWeight: "700",
+    color: "#4C1D95",
+  },
+  em: {
+    fontStyle: "italic",
+  },
+  bullet_list: {
+    marginBottom: 8,
+  },
+  ordered_list: {
+    marginBottom: 8,
+  },
+  list_item: {
+    marginBottom: 4,
+  },
+  bullet_list_icon: {
+    color: "#7C3AED",
+  },
+  code_inline: {
+    backgroundColor: "#EDE9FE",
+    color: "#4C1D95",
+    paddingHorizontal: 4,
+    borderRadius: 4,
+    fontFamily: "Menlo",
+    fontSize: 15,
+  },
+  blockquote: {
+    backgroundColor: "#EDE9FE",
+    borderLeftWidth: 3,
+    borderLeftColor: "#7C3AED",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginVertical: 6,
   },
 });
