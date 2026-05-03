@@ -18,6 +18,11 @@ export interface ServerToClientEvents {
     requestId: string;
     analysis: PresendAnalysis;
   }) => void;
+  "typing:state": (payload: {
+    userId: string;
+    conversationId: string;
+    isTyping: boolean;
+  }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -29,4 +34,6 @@ export interface ClientToServerEvents {
   "presend:analyze": (
     payload: PresendAnalyzePayload & { requestId: string },
   ) => void;
+  "typing:start": (conversationId: string) => void;
+  "typing:stop": (conversationId: string) => void;
 }

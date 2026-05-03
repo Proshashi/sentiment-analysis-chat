@@ -128,6 +128,28 @@ export function attachRealtime(httpServer: HTTPServer): IO {
       }
     });
 
+    socket.on("typing:start", (conversationId) => {
+      if (typeof conversationId !== "string" || !conversationId) return;
+      const userId = socket.handshake.auth?.userId;
+      if (typeof userId !== "string" || !userId) return;
+      socket.to(room(conversationId)).emit("typing:state", {
+        userId,
+        conversationId,
+        isTyping: true,
+      });
+    });
+
+    socket.on("typing:stop", (conversationId) => {
+      if (typeof conversationId !== "string" || !conversationId) return;
+      const userId = socket.handshake.auth?.userId;
+      if (typeof userId !== "string" || !userId) return;
+      socket.to(room(conversationId)).emit("typing:state", {
+        userId,
+        conversationId,
+        isTyping: false,
+      });
+    });
+
     socket.on("disconnect", (reason) => {
       console.log(`socket disconnected: ${socket.id} (${reason})`);
     });

@@ -15,6 +15,7 @@ import {
 } from "../src/components/message-input";
 import { MessageList } from "../src/components/message-list";
 import { PresendModal } from "../src/components/presend-modal";
+import { TypingIndicator } from "../src/components/typing-indicator";
 import {
   MessagesProvider,
   useMessages,
@@ -53,6 +54,9 @@ function ConversationContent() {
     presend,
     analyzeDraft,
     clearPresend,
+    typingUsers,
+    emitTypingStart,
+    emitTypingStop,
   } = useConversationSocket({
     conversationId: CONVERSATION_ID,
     userId: currentUser?.id ?? "",
@@ -127,6 +131,10 @@ function ConversationContent() {
         <MessageList messages={messages} currentUserId={currentUser.id} />
       </View>
 
+      {typingUsers.includes(otherUser.id) ? (
+        <TypingIndicator name={otherUser.name} />
+      ) : null}
+
       <MessageInput
         ref={inputRef}
         onSend={(content) => {
@@ -134,6 +142,8 @@ function ConversationContent() {
           clearPresend();
         }}
         onAnalyze={analyzeDraft}
+        onTypingStart={emitTypingStart}
+        onTypingStop={emitTypingStop}
       />
 
       <MediatorOverlay state={mediator} onClose={dismissMediator} />

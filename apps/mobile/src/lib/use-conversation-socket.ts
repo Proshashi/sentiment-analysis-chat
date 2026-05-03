@@ -36,7 +36,12 @@ interface UseConversationSocket {
   presend: PresendState;
   analyzeDraft: (draft: string) => void;
   clearPresend: () => void;
+  typingUsers: string[];
+  emitTypingStart: () => void;
+  emitTypingStop: () => void;
 }
+
+const TYPING_AUTO_EXPIRE_MS = 4000;
 
 const INITIAL_MEDIATOR: MediatorState = {
   open: false,
@@ -67,10 +72,14 @@ export function useConversationSocket({
   const activeRequestIdRef = useRef<string | null>(null);
   const activePresendIdRef = useRef<string | null>(null);
   const presendDraftRef = useRef<string>("");
+  const typingExpireTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediator, setMediator] = useState<MediatorState>(INITIAL_MEDIATOR);
   const [presend, setPresend] = useState<PresendState>(INITIAL_PRESEND);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +148,27 @@ export function useConversationSocket({
       });
     });
 
+    socket.on("typing:state", ({ userId: typingUserId, isTyping }) => {
+      if (cancelled) return;
+      if (typingUserId === userId) return;
+      const timers = typingExpireTimersRef.current;
+      const existing = timers.get(typingUserId);
+      if (existing) clearTimeout(existing);
+      if (isTyping) {
+        setTypingUsers((prev) =>
+          prev.includes(typingUserId) ? prev : [...prev, typingUserId],
+        );
+        const timer = setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((u) => u !== typingUserId));
+          timers.delete(typingUserId);
+        }, TYPING_AUTO_EXPIRE_MS);
+        timers.set(typingUserId, timer);
+      } else {
+        setTypingUsers((prev) => prev.filter((u) => u !== typingUserId));
+        timers.delete(typingUserId);
+      }
+    });
+
     (async () => {
       try {
         const history = await fetchMessages(conversationId);
@@ -156,6 +186,9 @@ export function useConversationSocket({
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
+      const timers = typingExpireTimersRef.current;
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
     };
   }, [conversationId, userId, upsertMessage, setAll, applySentiment]);
 
@@ -216,6 +249,14 @@ export function useConversationSocket({
     setPresend(INITIAL_PRESEND);
   }, []);
 
+  const emitTypingStart = useCallback(() => {
+    socketRef.current?.emit("typing:start", conversationId);
+  }, [conversationId]);
+
+  const emitTypingStop = useCallback(() => {
+    socketRef.current?.emit("typing:stop", conversationId);
+  }, [conversationId]);
+
   return {
     ready,
     error,
@@ -226,5 +267,8 @@ export function useConversationSocket({
     presend,
     analyzeDraft,
     clearPresend,
+    typingUsers,
+    emitTypingStart,
+    emitTypingStop,
   };
 }
