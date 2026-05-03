@@ -9,8 +9,23 @@ import {
   Text,
   View,
 } from "react-native";
-import Markdown from "react-native-markdown-display";
+import Markdown, { renderRules } from "react-native-markdown-display";
 import type { MediatorState } from "../lib/use-conversation-socket";
+
+const selectableRules = {
+  ...renderRules,
+  text: (
+    node: { key: string; content: string },
+    _children: unknown,
+    _parent: unknown,
+    styles: { text?: object },
+    inheritedStyles: object = {},
+  ) => (
+    <Text key={node.key} style={[inheritedStyles, styles.text]} selectable>
+      {node.content}
+    </Text>
+  ),
+};
 
 interface Props {
   state: MediatorState;
@@ -81,7 +96,9 @@ export function MediatorOverlay({ state, onClose }: Props) {
             </View>
           ) : (
             <View>
-              <Markdown style={markdownStyles}>{state.text}</Markdown>
+              <Markdown style={markdownStyles} rules={selectableRules}>
+                {state.text}
+              </Markdown>
               {state.streaming ? (
                 <Animated.Text
                   style={[styles.cursor, { opacity: cursorOpacity }]}
