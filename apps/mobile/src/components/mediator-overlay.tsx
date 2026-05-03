@@ -12,17 +12,50 @@ import {
 import Markdown, { renderRules } from "react-native-markdown-display";
 import type { MediatorState } from "../lib/use-conversation-socket";
 
+type TextNode = { key: string; content: string };
+type StyleObj = Record<string, object | undefined>;
+
 const selectableRules = {
   ...renderRules,
   text: (
-    node: { key: string; content: string },
+    node: TextNode,
     _children: unknown,
     _parent: unknown,
-    styles: { text?: object },
+    styles: StyleObj,
     inheritedStyles: object = {},
   ) => (
     <Text key={node.key} style={[inheritedStyles, styles.text]} selectable>
       {node.content}
+    </Text>
+  ),
+  textgroup: (
+    node: TextNode,
+    children: React.ReactNode,
+    _parent: unknown,
+    styles: StyleObj,
+  ) => (
+    <Text key={node.key} style={styles.textgroup} selectable>
+      {children}
+    </Text>
+  ),
+  strong: (
+    node: TextNode,
+    children: React.ReactNode,
+    _parent: unknown,
+    styles: StyleObj,
+  ) => (
+    <Text key={node.key} style={styles.strong} selectable>
+      {children}
+    </Text>
+  ),
+  em: (
+    node: TextNode,
+    children: React.ReactNode,
+    _parent: unknown,
+    styles: StyleObj,
+  ) => (
+    <Text key={node.key} style={styles.em} selectable>
+      {children}
     </Text>
   ),
 };
