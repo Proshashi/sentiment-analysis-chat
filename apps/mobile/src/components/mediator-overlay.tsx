@@ -15,6 +15,8 @@ import type { MediatorState } from "../lib/use-conversation-socket";
 type TextNode = { key: string; content: string };
 type StyleObj = Record<string, object | undefined>;
 
+const SELECTION_COLOR = "#7C3AED50";
+
 const selectableRules = {
   ...renderRules,
   text: (
@@ -24,7 +26,12 @@ const selectableRules = {
     styles: StyleObj,
     inheritedStyles: object = {},
   ) => (
-    <Text key={node.key} style={[inheritedStyles, styles.text]} selectable>
+    <Text
+      key={node.key}
+      style={[inheritedStyles, styles.text]}
+      selectable
+      selectionColor={SELECTION_COLOR}
+    >
       {node.content}
     </Text>
   ),
@@ -34,27 +41,12 @@ const selectableRules = {
     _parent: unknown,
     styles: StyleObj,
   ) => (
-    <Text key={node.key} style={styles.textgroup} selectable>
-      {children}
-    </Text>
-  ),
-  strong: (
-    node: TextNode,
-    children: React.ReactNode,
-    _parent: unknown,
-    styles: StyleObj,
-  ) => (
-    <Text key={node.key} style={styles.strong} selectable>
-      {children}
-    </Text>
-  ),
-  em: (
-    node: TextNode,
-    children: React.ReactNode,
-    _parent: unknown,
-    styles: StyleObj,
-  ) => (
-    <Text key={node.key} style={styles.em} selectable>
+    <Text
+      key={node.key}
+      style={styles.textgroup}
+      selectable
+      selectionColor={SELECTION_COLOR}
+    >
       {children}
     </Text>
   ),

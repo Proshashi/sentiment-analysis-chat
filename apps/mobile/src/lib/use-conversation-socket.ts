@@ -42,6 +42,7 @@ interface UseConversationSocket {
 }
 
 const TYPING_AUTO_EXPIRE_MS = 4000;
+const MEDIATOR_REVEAL_INTERVAL_MS = 6;
 
 const INITIAL_MEDIATOR: MediatorState = {
   open: false,
@@ -75,6 +76,37 @@ export function useConversationSocket({
   const typingExpireTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const mediatorBufferRef = useRef<string>("");
+  const mediatorDoneRef = useRef<boolean>(false);
+  const mediatorRevealRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopReveal() {
+    if (mediatorRevealRef.current) {
+      clearInterval(mediatorRevealRef.current);
+      mediatorRevealRef.current = null;
+    }
+  }
+
+  function startReveal() {
+    if (mediatorRevealRef.current) return;
+    mediatorRevealRef.current = setInterval(() => {
+      setMediator((prev) => {
+        if (!prev.open || prev.error) {
+          stopReveal();
+          return prev;
+        }
+        const buffer = mediatorBufferRef.current;
+        if (prev.text.length >= buffer.length) {
+          if (mediatorDoneRef.current) {
+            stopReveal();
+            return { ...prev, streaming: false };
+          }
+          return prev;
+        }
+        return { ...prev, text: buffer.slice(0, prev.text.length + 1) };
+      });
+    }, MEDIATOR_REVEAL_INTERVAL_MS);
+  }
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediator, setMediator] = useState<MediatorState>(INITIAL_MEDIATOR);
@@ -119,18 +151,21 @@ export function useConversationSocket({
     socket.on("mediator:chunk", ({ requestId, delta }) => {
       if (cancelled) return;
       if (requestId !== activeRequestIdRef.current) return;
-      setMediator((prev) => ({ ...prev, text: prev.text + delta }));
+      mediatorBufferRef.current += delta;
+      startReveal();
     });
 
     socket.on("mediator:done", ({ requestId }) => {
       if (cancelled) return;
       if (requestId !== activeRequestIdRef.current) return;
-      setMediator((prev) => ({ ...prev, streaming: false }));
+      mediatorDoneRef.current = true;
+      startReveal();
     });
 
     socket.on("mediator:error", ({ requestId, message }) => {
       if (cancelled) return;
       if (requestId !== activeRequestIdRef.current) return;
+      stopReveal();
       setMediator((prev) => ({
         ...prev,
         streaming: false,
@@ -189,6 +224,7 @@ export function useConversationSocket({
       const timers = typingExpireTimersRef.current;
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
+      stopReveal();
     };
   }, [conversationId, userId, upsertMessage, setAll, applySentiment]);
 
@@ -212,6 +248,9 @@ export function useConversationSocket({
     if (!socket) return;
     const requestId = newRequestId();
     activeRequestIdRef.current = requestId;
+    mediatorBufferRef.current = "";
+    mediatorDoneRef.current = false;
+    stopReveal();
     setMediator({ open: true, streaming: true, text: "", error: null });
     socket.emit("mediator:request", {
       conversationId,
@@ -222,6 +261,9 @@ export function useConversationSocket({
 
   const dismissMediator = useCallback(() => {
     activeRequestIdRef.current = null;
+    mediatorBufferRef.current = "";
+    mediatorDoneRef.current = false;
+    stopReveal();
     setMediator(INITIAL_MEDIATOR);
   }, []);
 
