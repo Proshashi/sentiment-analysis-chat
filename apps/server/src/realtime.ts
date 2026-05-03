@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io";
 import {
   mediatorRequestPayload,
   messageSendPayload,
+  presendAnalyzePayload,
   type ClientToServerEvents,
   type Message,
   type ServerToClientEvents,
@@ -16,6 +17,7 @@ import {
 } from "./db";
 import { analyzeSentiment } from "./sentiment";
 import { streamMediator } from "./mediator";
+import { analyzeDraft } from "./presend";
 
 const SENTIMENT_CONTEXT_LIMIT = 5;
 
@@ -101,6 +103,29 @@ export function attachRealtime(httpServer: HTTPServer): IO {
           });
         },
       });
+    });
+
+    socket.on("presend:analyze", async (rawPayload) => {
+      const { requestId, ...rest } = rawPayload ?? {};
+      const parsed = presendAnalyzePayload.safeParse(rest);
+      if (!parsed.success || typeof requestId !== "string" || !requestId) {
+        console.warn(
+          "invalid presend:analyze payload",
+          parsed.success ? "missing requestId" : parsed.error.flatten(),
+        );
+        return;
+      }
+      const { conversationId, senderId, draft } = parsed.data;
+      if (!getConversation(conversationId)) {
+        console.warn(`presend refused: unknown conversation ${conversationId}`);
+        return;
+      }
+      try {
+        const analysis = await analyzeDraft(conversationId, senderId, draft);
+        socket.emit("presend:result", { requestId, analysis });
+      } catch (err) {
+        console.error("presend failed:", err);
+      }
     });
 
     socket.on("disconnect", (reason) => {

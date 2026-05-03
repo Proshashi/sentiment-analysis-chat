@@ -5,7 +5,7 @@ import {
   getApiUrl,
   type JinglesSocket,
 } from "@jingles/api-client";
-import type { Message, Sentiment } from "@jingles/shared";
+import type { Message, PresendAnalysis, Sentiment } from "@jingles/shared";
 import { useMessages } from "./messages-context";
 
 interface UseConversationSocketArgs {
@@ -20,6 +20,12 @@ export interface MediatorState {
   error: string | null;
 }
 
+export interface PresendState {
+  loading: boolean;
+  analysis: PresendAnalysis | null;
+  draft: string;
+}
+
 interface UseConversationSocket {
   ready: boolean;
   error: string | null;
@@ -27,6 +33,9 @@ interface UseConversationSocket {
   mediator: MediatorState;
   requestMediator: () => void;
   dismissMediator: () => void;
+  presend: PresendState;
+  analyzeDraft: (draft: string) => void;
+  clearPresend: () => void;
 }
 
 const INITIAL_MEDIATOR: MediatorState = {
@@ -34,6 +43,12 @@ const INITIAL_MEDIATOR: MediatorState = {
   streaming: false,
   text: "",
   error: null,
+};
+
+const INITIAL_PRESEND: PresendState = {
+  loading: false,
+  analysis: null,
+  draft: "",
 };
 
 function newRequestId(): string {
@@ -50,9 +65,12 @@ export function useConversationSocket({
   const { upsertMessage, setAll, applySentiment } = useMessages();
   const socketRef = useRef<JinglesSocket | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
+  const activePresendIdRef = useRef<string | null>(null);
+  const presendDraftRef = useRef<string>("");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediator, setMediator] = useState<MediatorState>(INITIAL_MEDIATOR);
+  const [presend, setPresend] = useState<PresendState>(INITIAL_PRESEND);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +129,16 @@ export function useConversationSocket({
       }));
     });
 
+    socket.on("presend:result", ({ requestId, analysis }) => {
+      if (cancelled) return;
+      if (requestId !== activePresendIdRef.current) return;
+      setPresend({
+        loading: false,
+        analysis,
+        draft: presendDraftRef.current,
+      });
+    });
+
     (async () => {
       try {
         const history = await fetchMessages(conversationId);
@@ -164,6 +192,30 @@ export function useConversationSocket({
     setMediator(INITIAL_MEDIATOR);
   }, []);
 
+  const analyzeDraft = useCallback(
+    (draft: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      const requestId = newRequestId();
+      activePresendIdRef.current = requestId;
+      presendDraftRef.current = draft;
+      setPresend({ loading: true, analysis: null, draft });
+      socket.emit("presend:analyze", {
+        conversationId,
+        senderId: userId,
+        draft,
+        requestId,
+      });
+    },
+    [conversationId, userId],
+  );
+
+  const clearPresend = useCallback(() => {
+    activePresendIdRef.current = null;
+    presendDraftRef.current = "";
+    setPresend(INITIAL_PRESEND);
+  }, []);
+
   return {
     ready,
     error,
@@ -171,5 +223,8 @@ export function useConversationSocket({
     mediator,
     requestMediator,
     dismissMediator,
+    presend,
+    analyzeDraft,
+    clearPresend,
   };
 }

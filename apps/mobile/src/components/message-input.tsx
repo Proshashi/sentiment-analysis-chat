@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -8,52 +8,86 @@ import {
 
 interface Props {
   onSend: (content: string) => void;
+  onAnalyze?: (draft: string) => void;
   disabled?: boolean;
 }
 
-export function MessageInput({ onSend, disabled }: Props) {
-  const [draft, setDraft] = useState("");
-
-  function handleSend() {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    onSend(trimmed);
-    setDraft("");
-  }
-
-  const canSend = draft.trim().length > 0 && !disabled;
-
-  return (
-    <View style={styles.container}>
-      <TextInput
-        style={styles.input}
-        value={draft}
-        onChangeText={setDraft}
-        placeholder="Message"
-        placeholderTextColor="#94A3B8"
-        multiline
-        editable={!disabled}
-        returnKeyType="default"
-      />
-      <Pressable
-        style={({ pressed }) => [
-          styles.sendButton,
-          !canSend && styles.sendDisabled,
-          pressed && canSend && styles.sendPressed,
-        ]}
-        onPress={handleSend}
-        disabled={!canSend}
-      >
-        <View
-          style={[
-            styles.sendArrow,
-            !canSend && styles.sendArrowDisabled,
-          ]}
-        />
-      </Pressable>
-    </View>
-  );
+export interface MessageInputHandle {
+  setText: (text: string) => void;
+  clear: () => void;
 }
+
+const ANALYZE_DEBOUNCE_MS = 1000;
+const ANALYZE_MIN_LENGTH = 8;
+
+export const MessageInput = forwardRef<MessageInputHandle, Props>(
+  function MessageInput({ onSend, onAnalyze, disabled }, ref) {
+    const [draft, setDraft] = useState("");
+    const lastAnalyzedRef = useRef<string>("");
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      setText: (text: string) => setDraft(text),
+      clear: () => setDraft(""),
+    }));
+
+    useEffect(() => {
+      if (!onAnalyze) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      const trimmed = draft.trim();
+      if (trimmed.length < ANALYZE_MIN_LENGTH) return;
+      if (trimmed === lastAnalyzedRef.current) return;
+      timerRef.current = setTimeout(() => {
+        lastAnalyzedRef.current = trimmed;
+        onAnalyze(trimmed);
+      }, ANALYZE_DEBOUNCE_MS);
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+      };
+    }, [draft, onAnalyze]);
+
+    function handleSend() {
+      const trimmed = draft.trim();
+      if (!trimmed) return;
+      onSend(trimmed);
+      setDraft("");
+      lastAnalyzedRef.current = "";
+    }
+
+    const canSend = draft.trim().length > 0 && !disabled;
+
+    return (
+      <View style={styles.container}>
+        <TextInput
+          style={styles.input}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Message"
+          placeholderTextColor="#94A3B8"
+          multiline
+          editable={!disabled}
+          returnKeyType="default"
+        />
+        <Pressable
+          style={({ pressed }) => [
+            styles.sendButton,
+            !canSend && styles.sendDisabled,
+            pressed && canSend && styles.sendPressed,
+          ]}
+          onPress={handleSend}
+          disabled={!canSend}
+        >
+          <View
+            style={[
+              styles.sendArrow,
+              !canSend && styles.sendArrowDisabled,
+            ]}
+          />
+        </Pressable>
+      </View>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   container: {

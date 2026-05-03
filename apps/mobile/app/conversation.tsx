@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,8 +9,12 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { MediatorOverlay } from "../src/components/mediator-overlay";
-import { MessageInput } from "../src/components/message-input";
+import {
+  MessageInput,
+  type MessageInputHandle,
+} from "../src/components/message-input";
 import { MessageList } from "../src/components/message-list";
+import { PresendModal } from "../src/components/presend-modal";
 import {
   MessagesProvider,
   useMessages,
@@ -39,12 +43,16 @@ export default function ConversationScreen() {
 function ConversationContent() {
   const { currentUser, otherUser } = useUser();
   const { messages } = useMessages();
+  const inputRef = useRef<MessageInputHandle>(null);
   const {
     send,
     error,
     mediator,
     requestMediator,
     dismissMediator,
+    presend,
+    analyzeDraft,
+    clearPresend,
   } = useConversationSocket({
     conversationId: CONVERSATION_ID,
     userId: currentUser?.id ?? "",
@@ -53,6 +61,20 @@ function ConversationContent() {
   if (!currentUser || !otherUser) return null;
 
   const canMediate = messages.length >= 2 && !mediator.streaming;
+
+  const presendVisible =
+    presend.analysis !== null && presend.analysis.shouldPrompt;
+
+  function handleUseSofter(softer: string) {
+    inputRef.current?.setText(softer);
+    clearPresend();
+  }
+
+  function handleSendAnyway() {
+    if (presend.draft) send(presend.draft);
+    inputRef.current?.clear();
+    clearPresend();
+  }
 
   return (
     <KeyboardAvoidingView
@@ -105,9 +127,25 @@ function ConversationContent() {
         <MessageList messages={messages} currentUserId={currentUser.id} />
       </View>
 
-      <MessageInput onSend={send} />
+      <MessageInput
+        ref={inputRef}
+        onSend={(content) => {
+          send(content);
+          clearPresend();
+        }}
+        onAnalyze={analyzeDraft}
+      />
 
       <MediatorOverlay state={mediator} onClose={dismissMediator} />
+
+      <PresendModal
+        visible={presendVisible}
+        draft={presend.draft}
+        analysis={presend.analysis}
+        onUseSofter={handleUseSofter}
+        onSendAnyway={handleSendAnyway}
+        onDismiss={clearPresend}
+      />
     </KeyboardAvoidingView>
   );
 }
