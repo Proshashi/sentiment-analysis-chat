@@ -1,19 +1,56 @@
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { router } from "expo-router";
+import { MessageInput } from "../src/components/message-input";
+import { MessageList } from "../src/components/message-list";
+import {
+  MessagesProvider,
+  useMessages,
+} from "../src/lib/messages-context";
 import { useUser } from "../src/lib/user-context";
+import { useConversationSocket } from "../src/lib/use-conversation-socket";
+
+const CONVERSATION_ID = "conv-1";
 
 export default function ConversationScreen() {
-  const { currentUser, otherUser } = useUser();
+  const { currentUser } = useUser();
 
   useEffect(() => {
     if (!currentUser) router.replace("/");
   }, [currentUser]);
 
+  if (!currentUser) return null;
+
+  return (
+    <MessagesProvider>
+      <ConversationContent />
+    </MessagesProvider>
+  );
+}
+
+function ConversationContent() {
+  const { currentUser, otherUser } = useUser();
+  const { messages } = useMessages();
+  const { send, error } = useConversationSocket({
+    conversationId: CONVERSATION_ID,
+    userId: currentUser?.id ?? "",
+  });
+
   if (!currentUser || !otherUser) return null;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={0}
+    >
       <View style={styles.header}>
         <Pressable
           onPress={() => router.replace("/")}
@@ -32,13 +69,18 @@ export default function ConversationScreen() {
         <View style={styles.back} />
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.empty}>No messages yet</Text>
-        <Text style={styles.emptyHint}>
-          Real-time chat lands in the next phase.
-        </Text>
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>Connection problem: {error}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.messages}>
+        <MessageList messages={messages} currentUserId={currentUser.id} />
       </View>
-    </View>
+
+      <MessageInput onSend={send} />
+    </KeyboardAvoidingView>
   );
 }
 
@@ -85,19 +127,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0F172A",
   },
-  body: {
+  messages: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
   },
-  empty: {
-    fontSize: 18,
-    color: "#94A3B8",
-    fontWeight: "600",
+  errorBanner: {
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  emptyHint: {
-    fontSize: 14,
-    color: "#CBD5E1",
+  errorText: {
+    color: "#7F1D1D",
+    fontSize: 13,
   },
 });

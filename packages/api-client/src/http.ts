@@ -1,4 +1,4 @@
-import type { User } from "@jingles/shared";
+import type { Message, User } from "@jingles/shared";
 
 export function getApiUrl(): string {
   const url = process.env.EXPO_PUBLIC_API_URL;
@@ -19,5 +19,15 @@ export async function fetchHealth(): Promise<{ ok: boolean }> {
 export async function fetchUsers(): Promise<User[]> {
   const res = await fetch(`${getApiUrl()}/users`);
   if (!res.ok) throw new Error(`users failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchMessages(
+  conversationId: string,
+): Promise<Message[]> {
+  const res = await fetch(
+    `${getApiUrl()}/conversations/${encodeURIComponent(conversationId)}/messages`,
+  );
+  if (!res.ok) throw new Error(`messages failed: ${res.status}`);
   return res.json();
 }
