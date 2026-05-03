@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Server as HTTPServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import {
+  mediatorRequestPayload,
   messageSendPayload,
   type ClientToServerEvents,
   type Message,
@@ -14,6 +15,7 @@ import {
   updateMessageSentiment,
 } from "./db";
 import { analyzeSentiment } from "./sentiment";
+import { streamMediator } from "./mediator";
 
 const SENTIMENT_CONTEXT_LIMIT = 5;
 
@@ -68,6 +70,37 @@ export function attachRealtime(httpServer: HTTPServer): IO {
       io.to(room(conversationId)).emit("message:new", msg);
 
       void runSentiment(io, msg);
+    });
+
+    socket.on("mediator:request", (rawPayload) => {
+      const { requestId, ...rest } = rawPayload ?? {};
+      const parsed = mediatorRequestPayload.safeParse(rest);
+      if (!parsed.success || typeof requestId !== "string" || !requestId) {
+        console.warn(
+          "invalid mediator:request payload",
+          parsed.success ? "missing requestId" : parsed.error.flatten(),
+        );
+        return;
+      }
+      const { conversationId, requesterId } = parsed.data;
+      if (!getConversation(conversationId)) {
+        socket.emit("mediator:error", {
+          requestId,
+          message: "unknown conversation",
+        });
+        return;
+      }
+      void streamMediator(conversationId, requesterId, {
+        onChunk: (delta) => socket.emit("mediator:chunk", { requestId, delta }),
+        onDone: () => socket.emit("mediator:done", { requestId }),
+        onError: (err) => {
+          console.error("mediator failed:", err);
+          socket.emit("mediator:error", {
+            requestId,
+            message: err.message || "mediator failed",
+          });
+        },
+      });
     });
 
     socket.on("disconnect", (reason) => {
