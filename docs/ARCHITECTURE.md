@@ -6,11 +6,11 @@ This document describes the system architecture for the Jingles product: the wor
 
 ## 1. Executive Summary
 
-Jingles is a couples-communication app. Two people chat. **After** a message is sent, a small AI sentiment label fades in below the bubble — words like "warm", "defensive", or "vulnerable" — typically within a second or two. The sender doesn't see this on their own draft; sentiment is post-send only. **Before** sending, a separate pre-send check looks at the draft itself and, if it reads as critical or defensive, slides up a soft prompt with a rewrite suggestion the sender can accept or override. At any point, either person can summon a neutral AI mediator that streams a short reflection of both perspectives plus one concrete next step.
+Jingles is a couples-communication app. Two people chat. **While typing**, the sender sees a small "Your tone: <label>" preview above the input that updates whenever they pause — a private, advisory read of how the draft is coming across. **After** a message is sent, a similar AI sentiment label — "warm", "defensive", "vulnerable" — fades in below the bubble on both clients within a second or two; this is the canonical post-send classification, visible to both people. **Before** sending, a separate pre-send check looks at the draft itself for Gottman-style communication patterns; if it reads as critical or defensive, an amber modal slides up with a softer rewrite the sender can accept or override. At any point, either person can summon a neutral AI mediator that streams a short reflection of both perspectives plus one concrete next step.
 
 The product spans **two codebases**. The client already has a **Next.js + Supabase web app** (landing, signup, account portal — roughly 50–60% complete per the client's AI analysis, pending verification). The chat experience and AI features will live primarily in a **new React Native + Expo mobile app**, which the demo represents end-to-end.
 
-The 24-hour demo proves the mobile half. It runs on a Node + Socket.io + SQLite local stack, hits the Anthropic Claude API directly for sentiment (`claude-haiku-4-5`), pre-send analysis, and a streaming mediator (`claude-sonnet-4-6`), and renders an iMessage-style chat with animated sentiment indicators, a streaming mediator overlay, a slide-up pre-send modal, and a typing indicator. All three AI flows hit the live Anthropic API and return real responses in seconds.
+The 24-hour demo proves the mobile half. It runs on a Node + Socket.io + SQLite local stack, hits the Anthropic Claude API directly for sentiment (`claude-haiku-4-5`), pre-send analysis (`claude-sonnet-4-6`), and a streaming mediator (`claude-sonnet-4-6`), and renders an iMessage-style chat with animated post-send sentiment indicators, a live draft tone preview, a streaming mediator overlay, a slide-up pre-send rewrite modal, and a typing indicator. All AI flows hit the live Anthropic API and return real responses in seconds.
 
 Tech choices, one-liner each: **React Native + Expo** because it eliminates Xcode/Android friction for cross-platform shipping; **Supabase** because the web app is already on it and it gives auth, Postgres, realtime, and storage in one stack; **Anthropic Claude** because tool use returns reliable structured JSON for sentiment and pre-send, and because Sonnet's mediator output reads as nuanced and non-prescriptive; **Socket.io for AI streaming** because Supabase Realtime doesn't natively stream chunked tokens; **Drizzle ORM** for backend type-safety against Postgres; **WatermelonDB** on mobile for offline-first message storage; **Turborepo + pnpm** so web and mobile share types and Zod schemas through `packages/shared`.
 
@@ -20,7 +20,7 @@ Tech choices, one-liner each: **React Native + Expo** because it eliminates Xcod
 
 **What exists today (web).** A Next.js + Supabase web app with auth scaffolding, a signup flow, profile and settings routes, message and room route stubs, and PWA wrappers. The client's AI estimates 50–60% completion. **This estimate is unverified** — a paid repo review in week 1 will produce a real audit.
 
-**What the demo proves (mobile + AI).** A working real-time chat between two pre-seeded users (Alex, Jamie) with: (a) live message broadcast under 200 ms on LAN, (b) post-send sentiment classification appearing under each bubble within ~1.5 s, (c) a streaming AI mediator that reflects both perspectives and ends with a concrete suggestion, (d) a pre-send modal that catches defensive drafts and offers a softer rewrite, (e) a typing indicator. All AI calls hit Claude live; nothing is faked.
+**What the demo proves (mobile + AI).** A working real-time chat between two pre-seeded users (Alex, Jamie) with: (a) live message broadcast under 200 ms on LAN, (b) a live draft tone preview that updates above the input while typing ("Your tone: warm"), (c) post-send sentiment classification appearing under each bubble within ~1.5 s, (d) a streaming AI mediator that reflects both perspectives and ends with a concrete suggestion, (e) a pre-send modal that catches defensive drafts and offers a softer rewrite, (f) a typing indicator. All AI calls hit Claude live; nothing is faked.
 
 **What the engagement delivers.** Three things in parallel: finish the existing web app (complete flows, fix bugs surfaced by review, add 2FA), productionize the mobile app from the demo (Supabase Realtime, WatermelonDB offline, push notifications, store submission), and stand up a shared backend + AI pipeline that both surfaces consume.
 
@@ -81,7 +81,7 @@ flowchart LR
 
 ### Component breakdown
 
-- **Mobile app (`apps/mobile`).** Expo Router (file-based) with one provider tree: `UserProvider` (root) and `MessagesProvider` (per-conversation). One hook owns the socket lifecycle: `apps/mobile/src/lib/use-conversation-socket.ts`. Components: `MessageList`, `MessageBubble`, `MessageInput`, `SentimentIndicator`, `MediatorOverlay`, `PresendModal`, `TypingIndicator`.
+- **Mobile app (`apps/mobile`).** Expo Router (file-based) with one provider tree: `UserProvider` (root) and `MessagesProvider` (per-conversation). One hook owns the socket lifecycle: `apps/mobile/src/lib/use-conversation-socket.ts`. Components: `MessageList`, `MessageBubble`, `MessageInput`, `SentimentIndicator` (post-send, under each bubble), `DraftSentimentIndicator` (pre-send, above the input), `MediatorOverlay`, `PresendModal`, `TypingIndicator`. The post-send and draft indicators share a single color map at `apps/mobile/src/lib/sentiment-colors.ts` so the same label always renders the same color regardless of where it appears.
 - **Server (`apps/server`).** Express + `socket.io` mounted on the same HTTP server. Handlers for `conversation:join`, `message:send`, `mediator:request`, `presend:analyze`, `typing:start`, `typing:stop` live in `apps/server/src/realtime.ts`. AI logic in three files: `sentiment.ts`, `mediator.ts`, `presend.ts`.
 - **Database.** SQLite via `better-sqlite3`. Single file at `apps/server/data.db`, WAL mode for crash safety. Three tables, schema in `apps/server/src/db.ts`. Idempotent seed for Alex + Jamie + one conversation.
 - **AI provider.** `@anthropic-ai/sdk` v0.65, single client constructed from `ANTHROPIC_API_KEY`. Sentiment uses `claude-haiku-4-5` with tool use; pre-send uses `claude-sonnet-4-6` with tool use; mediator uses `claude-sonnet-4-6` streaming.
@@ -97,8 +97,8 @@ flowchart LR
 | Server → Clients | `message:analyzed` | Sentiment returns | Clients merge sentiment by message id |
 | Client → Server | `mediator:request` | Tap Mediator pill | Streams Sonnet response to requester only |
 | Server → Client | `mediator:chunk` / `:done` / `:error` | Per-token + completion | Mobile buffers + reveals at 6 ms/char |
-| Client → Server | `presend:analyze` | Debounced 1 s after typing pause | Awaits Sonnet, replies once |
-| Server → Client | `presend:result` | Analysis returns | If `shouldPrompt`, slide-up amber modal |
+| Client → Server | `presend:analyze` | Debounced 1 s after typing pause | Awaits Sonnet `analyze_draft` tool, replies once |
+| Server → Client | `presend:result` | Analysis returns | Updates draft tone preview from `sentimentLabel`; if `shouldPrompt`, also slides up amber rewrite modal |
 | Client → Server | `typing:start` / `:stop` | First keystroke / 2 s idle / send | Per-keystroke throttle |
 | Server → Other clients | `typing:state` | Forwards to room minus sender | Other client shows pulsing dots |
 
@@ -326,10 +326,10 @@ The existing Next.js web app is the **marketing surface, signup, and account por
 flowchart TB
     MSG[New message draft or sent]
 
-    subgraph PreSend [Pre-send - synchronous - blocks send if user accepts]
+    subgraph PreSend [Pre-send - one Sonnet call drives both modal and tone preview]
         PSI[debounce 1s]
         PSA[analyze_draft tool<br/>Sonnet 4.6]
-        PSO[tone severity should_prompt<br/>softer_alternative]
+        PSO[tone severity should_prompt<br/>softer_alternative<br/>sentimentLabel]
     end
 
     subgraph PostSend [Post-send sentiment - async]
@@ -363,8 +363,8 @@ flowchart TB
 
 | Layer | Model | Why |
 |---|---|---|
-| Sentiment (every message) | `claude-haiku-4-5` | Hot path; cheapest; tool use returns structured output reliably; ~1.5 s |
-| Pre-send analysis | `claude-sonnet-4-6` | Needs nuance for "softer alternative" rewrite; ~2.5 s acceptable since user is paused |
+| Post-send sentiment (every sent message) | `claude-haiku-4-5` | Hot path on the send side; cheapest; tool use returns structured output reliably; ~1.5 s |
+| Pre-send analysis (tone + draft sentiment, both from one call) | `claude-sonnet-4-6` | Needs nuance for "softer alternative" rewrite; the same call also returns a `sentimentLabel` for the live "Your tone:" preview, so the draft indicator costs zero extra API spend; ~2.5 s acceptable since user is paused |
 | Mediator | `claude-sonnet-4-6` | Reflective tone matters; streaming gives the wow factor; ~6 s for 1000 chars |
 | Conv-level trends (future) | `claude-sonnet-4-6` | Batched nightly; cost amortized |
 
@@ -420,6 +420,7 @@ Cache breakpoints sit on stable prefixes:
 - **Decision:** Anthropic Claude (Sonnet + Haiku). **Why:** tool use returns clean structured JSON for sentiment and pre-send (verified in the demo); Sonnet's mediator output is unusually nuanced and non-prescriptive, exactly the tone the product needs. Pricing tiers cover the cost shape (Haiku for hot path, Sonnet for thoughtful tasks). **Alternatives considered:** OpenAI GPT-4o (also good; the Anthropic terms around training and the tone of mediator output tipped it).
 - **Decision:** Turborepo + pnpm monorepo. **Why:** web + mobile share `packages/shared` for types and Zod schemas, and `packages/api-client` for the typed Supabase wrapper. Schema change in one place, both surfaces update. **Alternatives considered:** separate repos (duplicated types, drift); Nx (heavier, more configuration than the team needs).
 - **Decision:** Finish the existing web app rather than rewrite. **Why:** half-rewrites on tight timelines lose more than they gain; the existing code is on a sane stack (Next.js + Supabase) and can be brought to v1 quality. **Alternatives considered:** rewrite from scratch in 2026's Next.js patterns (only if week-1 audit surfaces blockers, e.g. severe security issues or unworkable architecture).
+- **Decision:** Combine pre-send tone analysis and draft sentiment classification into a single Sonnet 4.6 `analyze_draft` tool call. **Why:** the user is already paused for 1 s of debounce; one model call producing both `tone`/`severity`/`shouldPrompt`/`softerAlternative` and `sentimentLabel` halves the API spend per debounced pause and avoids two parallel awaits. **Alternatives considered:** firing a separate Haiku `classify_message` call on the draft via `Promise.all` (would guarantee draft and post-send labels match exactly since both run Haiku, at the cost of an extra API call per pause; deferred as an optimization if label drift between Sonnet's draft read and Haiku's post-send read becomes user-visible noise).
 
 ---
 
