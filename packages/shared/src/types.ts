@@ -61,4 +61,5 @@ export interface PresendAnalysis {
   shouldPrompt: boolean;
   softerAlternative: string | null;
   explanation: string;
+  sentimentLabel: SentimentLabel | null;
 }

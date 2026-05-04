@@ -33,4 +33,5 @@ export const presendAnalysisSchema = z.object({
   shouldPrompt: z.boolean(),
   softerAlternative: z.string().nullable(),
   explanation: z.string(),
+  sentimentLabel: z.enum(SENTIMENT_LABELS).nullable(),
 });

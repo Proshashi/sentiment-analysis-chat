@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import { DraftSentimentIndicator } from "../src/components/draft-sentiment-indicator";
 import { MediatorOverlay } from "../src/components/mediator-overlay";
 import {
   MessageInput,
@@ -133,7 +134,11 @@ function ConversationContent() {
 
       {typingUsers.includes(otherUser.id) ? (
         <TypingIndicator name={otherUser.name} />
-      ) : null}
+      ) : (
+        <DraftSentimentIndicator
+          label={presend.analysis?.sentimentLabel ?? null}
+        />
+      )}
 
       <MessageInput
         ref={inputRef}

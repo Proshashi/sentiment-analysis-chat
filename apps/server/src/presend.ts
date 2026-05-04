@@ -1,5 +1,6 @@
 import {
   PRESEND_TONES,
+  SENTIMENT_LABELS,
   presendAnalysisSchema,
   type Message,
   type PresendAnalysis,
@@ -15,7 +16,10 @@ You also detect aggressive, dismissive, or passive-aggressive tone.
 Use the provided tool to return structured analysis. Only set should_prompt=true
 if the severity is meaningful enough to interrupt the user. Always provide a
 softer_alternative that conveys the same content without the harmful tone when
-should_prompt is true.`;
+should_prompt is true.
+
+Always set sentimentLabel to the emotional sentiment that best describes the
+draft, regardless of whether shouldPrompt is true. Pick from the provided enum.`;
 
 const ANALYZE_TOOL = {
   name: "analyze_draft",
@@ -50,6 +54,12 @@ const ANALYZE_TOOL = {
         description:
           "One short sentence (under 25 words) explaining the tone classification.",
       },
+      sentimentLabel: {
+        type: "string",
+        enum: [...SENTIMENT_LABELS],
+        description:
+          "Emotional sentiment of the draft. Always set, regardless of tone or shouldPrompt.",
+      },
     },
     required: [
       "tone",
@@ -57,6 +67,7 @@ const ANALYZE_TOOL = {
       "shouldPrompt",
       "softerAlternative",
       "explanation",
+      "sentimentLabel",
     ],
   },
 };
