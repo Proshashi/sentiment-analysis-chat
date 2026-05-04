@@ -410,7 +410,7 @@ Cache breakpoints sit on stable prefixes:
 | 11 | Both | (a) Bug fix buffer; (b) App Store + Play Store submission packets; (c) Marketing site updates if needed; (d) Handover documentation |
 
 ---
-
+<!-- 
 ## 8. Decisions Log
 
 - **Decision:** Supabase Realtime for chat; small Node service for AI streaming. **Why:** the existing web app is already on Supabase, so realtime + auth + Postgres ride on the same stack at zero added complexity. AI streaming needs token-by-token delivery which Supabase Realtime doesn't model — a small Socket.io service handles that. **Alternatives considered:** Firestore (lock-in, web app would have to migrate); Stream Chat (excellent product but adds a third vendor and doesn't help the AI streaming case).
@@ -436,4 +436,4 @@ Cache breakpoints sit on stable prefixes:
 
 ---
 
-*Last updated: 2026-05-03. Demo commit reference: see `git log` in the project root for the full Phase 1–10 build history.*
+*Last updated: 2026-05-03. Demo commit reference: see `git log` in the project root for the full Phase 1–10 build history.* -->

@@ -12,7 +12,8 @@ Principles:
 - Acknowledge both perspectives
 - Never recommend ending the relationship
 - Keep response under 150 words
-- Respond with your guidance directly. Do not ask follow-up questions or offer to do additional things you cannot do (no "want me to draft a reply?", no "let me know if you'd like…", no "shall I…?"). End the response after your suggestion.`;
+- Respond with your guidance directly. Do not ask follow-up questions or offer to do additional things you cannot do (no "want me to draft a reply?", no "let me know if you'd like…", no "shall I…?"). End the response after your suggestion.
+- Address only the requester (the one who asked for guidance). Speak to them in the second person ("you", "your", "you're"). Refer to their partner in the third person by name ("Jamie seems to be…", "Alex has been…"). Never address both people in the same response. Do not open with the requester's name as a greeting; speak as if you are talking to them privately. The partner is not in the room.`;
 
 const MAX_HISTORY = 20;
 
@@ -66,11 +67,14 @@ export async function streamMediator(
     }
 
     const requesterName = nameFor(users, requesterId);
-    const userPrompt = `Below is a conversation between two people. ${requesterName} is asking you for guidance.
+    const partner = users.find((u) => u.id !== requesterId);
+    const partnerName = partner ? partner.name : "their partner";
+
+    const userPrompt = `Below is a conversation between ${requesterName} and ${partnerName}. ${requesterName} is asking you for guidance — privately, on their own device. ${partnerName} will not see your response.
 
 ${formatHistory(history, users)}
 
-Please respond as the mediator now.`;
+Respond now. Speak directly to ${requesterName} using "you" and "your". Refer to ${partnerName} in the third person by name. Do not greet ${requesterName} with their name; just speak to them.`;
 
     const stream = anthropic.messages.stream({
       model: "claude-sonnet-4-6",
